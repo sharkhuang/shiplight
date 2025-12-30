@@ -1,0 +1,33 @@
+{
+  "version": "1.0",
+  "description": "Access Control List for resources",
+  "resources": {
+    "resources/testfile1.txt": {
+      "user1": ["read", "write", "delete"],
+      "user2": ["read"]
+    },
+    "resources/testfile2.txt": {
+      "user2": ["read"]
+    }
+  },
+  "users": {
+    "user1": {
+      "name": "User One",
+      "role": "admin"
+    },
+    "user2": {
+      "name": "User Two",
+      "role": "viewer"
+    }
+  },
+  "roles": {
+    "admin": {
+      "description": "Full access to all resources",
+      "default_permissions": ["read", "write", "delete"]
+    },
+    "viewer": {
+      "description": "Read-only access",
+      "default_permissions": ["read"]
+    }
+  }
+}

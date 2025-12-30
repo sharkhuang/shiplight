@@ -1,0 +1,29 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ChromaDB persistence
+chroma_data/
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Misc
+.DS_Store
+*.log
+
