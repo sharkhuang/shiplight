@@ -129,12 +129,14 @@ class TestSearchEngine:
         results = engine.search("test", user_id="user2", n_results=1, method="query_first")
         assert len(results) == 1
 
-    def test_query_first_misses_results_filter_first_finds(self, engine):
+    def test_query_first_may_miss_low_ranked_accessible_docs(self, engine):
         """
-        Test case: query_first returns 0 results, filter_first returns 1.
+        Test that query_first may return fewer results when accessible
+        documents are ranked lower than n_results.
         
-        When many inaccessible documents rank higher than accessible ones,
-        query_first may miss accessible documents in its limited search.
+        This demonstrates the tradeoff:
+        - filter_first: Always finds accessible docs (searches only accessible)
+        - query_first: May miss accessible docs (searches top n_results only)
         """
         import json
         
@@ -167,8 +169,7 @@ class TestSearchEngine:
             query, user_id="user1", n_results=1, method="filter_first"
         )
         
-        # query_first: Searches all docs, top results are ML docs (inaccessible)
-        # After filtering, no accessible docs remain
+        # query_first: Searches top 1 result, which is an ML doc (inaccessible)
         query_results = engine.search(
             query, user_id="user1", n_results=1, method="query_first"
         )
@@ -176,7 +177,7 @@ class TestSearchEngine:
         # filter_first finds 1 result, query_first finds 0
         assert len(filter_results) == 1
         assert filter_results[0]["filename"] == "testfile1.txt"
-        assert len(query_results) == 0
+        assert len(query_results) == 0  # Accessible doc not in top 1
 
 
 if __name__ == "__main__":

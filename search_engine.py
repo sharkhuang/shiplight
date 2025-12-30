@@ -140,12 +140,10 @@ class SearchEngine:
         Better relevance ranking - finds most relevant docs first.
         Then filters out inaccessible ones (may return fewer than n_results).
         """
-        # Search more documents to account for filtering
-        search_limit = n_results * 3 if user_id else n_results
 
         results = self.collection.query(
             query_texts=[query],
-            n_results=search_limit,
+            n_results=n_results,
         )
 
         formatted = self._format_results(results)
