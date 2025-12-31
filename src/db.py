@@ -1,5 +1,5 @@
 """
-Database Update Module - Initialize and update ChromaDB vector database
+Database Module - Initialize and manage ChromaDB vector database
 """
 
 import json
@@ -19,10 +19,39 @@ class DBManager:
         resources_dir: str = "resources",
         acl_path: str = "config/acl.json",
         collection_name: str = "resources_db",
+        client: Optional[chromadb.Client] = None,
+        persist_directory: Optional[str] = None,
     ):
+        """
+        Initialize DBManager.
+        
+        Args:
+            resources_dir: Directory containing resource files
+            acl_path: Path to ACL configuration file
+            collection_name: Name of the ChromaDB collection
+            client: Optional ChromaDB client instance. If provided, this client will be used.
+                If not provided, a new client will be created.
+            persist_directory: Optional directory path for persistent storage.
+                If provided and client is None, creates a PersistentClient.
+                If both are None, uses in-memory client (not recommended for production).
+                Default: "./chroma_db" for persistent storage.
+        
+        Note: To share data between DBManager and SearchEngine, either:
+            1. Pass the same client instance to both, OR
+            2. Use the same persist_directory path in both
+        """
         self.resources_dir = Path(resources_dir)
         self.collection_name = collection_name
-        self.client = chromadb.Client()
+        
+        # Initialize ChromaDB client
+        if client is not None:
+            self.client = client
+        elif persist_directory is not None:
+            self.client = chromadb.PersistentClient(path=persist_directory)
+        else:
+            # Default to persistent storage for data sharing
+            self.client = chromadb.PersistentClient(path="./chroma_db")
+        
         self.collection = None
         
         # Initialize ACL manager

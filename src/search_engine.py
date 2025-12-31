@@ -3,12 +3,18 @@ Search Engine - Vector DB initialized with resources and ACL permissions
 """
 
 import json
+from typing import Optional
 
 import chromadb
 
 
 class SearchEngine:
-    def __init__(self, collection_name: str = "resources_db"):
+    def __init__(
+        self,
+        collection_name: str = "resources_db",
+        client: Optional[chromadb.Client] = None,
+        persist_directory: Optional[str] = None,
+    ):
         """
         Initialize SearchEngine for querying the vector database.
         
@@ -17,9 +23,27 @@ class SearchEngine:
         
         Args:
             collection_name: Name of the ChromaDB collection to query (default: "resources_db")
+            client: Optional ChromaDB client instance. If provided, this client will be used.
+                If not provided, a new client will be created.
+            persist_directory: Optional directory path for persistent storage.
+                If provided and client is None, creates a PersistentClient.
+                If both are None, uses in-memory client (not recommended for production).
+                Default: "./chroma_db" for persistent storage.
+        
+        Note: To share data with DBManager, either:
+            1. Pass the same client instance used by DBManager, OR
+            2. Use the same persist_directory path as DBManager
         """
-        self.client = chromadb.Client()
         self.collection_name = collection_name
+        
+        # Initialize ChromaDB client (must match DBManager's client for data sharing)
+        if client is not None:
+            self.client = client
+        elif persist_directory is not None:
+            self.client = chromadb.PersistentClient(path=persist_directory)
+        else:
+            # Default to persistent storage for data sharing
+            self.client = chromadb.PersistentClient(path="./chroma_db")
         
         # Get the existing collection (must be initialized by DBManager first)
         try:
@@ -128,7 +152,7 @@ class SearchEngine:
 
 def main():
     """Quick demo of SearchEngine."""
-    from .db_update import DBManager
+    from .db import DBManager
     
     # First, initialize the database using DBManager
     print("Initializing database with DBManager...")

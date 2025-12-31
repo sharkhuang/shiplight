@@ -16,12 +16,20 @@ env/
 *.swo
 
 # ChromaDB persistence
+chroma_db/
 chroma_data/
+*.sqlite3
 
 # Distribution / packaging
 dist/
 build/
 *.egg-info/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
 
 # Misc
 .DS_Store

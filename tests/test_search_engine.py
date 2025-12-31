@@ -4,21 +4,33 @@ Unit tests for SearchEngine
 
 import pytest
 from src.search_engine import SearchEngine
-from src.db_update import DBManager
+from src.db import DBManager
 
 
 class TestSearchEngine:
     """Test cases for SearchEngine class."""
 
     @pytest.fixture
-    def engine(self):
-        """Create and initialize database, then create SearchEngine instance."""
+    def engine(self, tmp_path):
+        """Create and initialize database, then create SearchEngine instance.
+        
+        Uses isolated temporary directory for each test to ensure test isolation.
+        """
+        # Create isolated database in temporary directory
+        test_db_path = str(tmp_path / "test_db")
+        
         # First, initialize the database using DBManager
-        db = DBManager(collection_name="resources_db")
+        db = DBManager(
+            collection_name="resources_db",
+            persist_directory=test_db_path
+        )
         db.init_db()
         
-        # Then, create SearchEngine to query the database
-        engine = SearchEngine(collection_name="resources_db")
+        # Then, create SearchEngine to query the database (using same path)
+        engine = SearchEngine(
+            collection_name="resources_db",
+            persist_directory=test_db_path
+        )
         return engine
 
     # ==================== Initialization ====================

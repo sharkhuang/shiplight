@@ -33,11 +33,13 @@ shiplight/
 │   ├── testfile1.txt         # Sample resource files
 │   └── testfile2.txt
 ├── src/
-│   └── __init__.py
+│   ├── __init__.py
+│   ├── acl.py                # Access Control List manager
+│   ├── db.py                 # Database management module
+│   └── search_engine.py      # Search engine with ACL filtering
 ├── tests/
-│   └── test_search_engine.py # Unit tests (19 tests)
-├── db_update.py              # Database management module
-├── search_engine.py          # Search engine with ACL filtering
+│   ├── test_acl.py           # ACL unit tests
+│   └── test_search_engine.py # Search engine unit tests
 ├── requirements.txt          # Dependencies
 └── README.md
 ```
@@ -54,7 +56,7 @@ shiplight/
 ### Database Management (Initialization & Updates)
 
 ```python
-from src.db_update import DBManager
+from src.db import DBManager
 
 # Initialize database (first time or full rebuild)
 db = DBManager()
@@ -88,7 +90,7 @@ db.delete_documents(["doc1"])
 ### Search Engine (Querying)
 
 ```python
-from src.db_update import DBManager
+from src.db import DBManager
 from src.search_engine import SearchEngine
 
 # Step 1: Initialize database (if not already done)
