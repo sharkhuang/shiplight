@@ -149,9 +149,6 @@ acl = ACLManager()
 # Check if user can perform action
 can_read = acl.can_access("user1", "resources/testfile1.txt", "read")  # True
 can_write = acl.can_access("user2", "resources/testfile1.txt", "write")  # False
-
-# Or access via SearchEngine's ACL manager
-can_read = engine.acl_manager.can_access("user1", "resources/testfile1.txt", "read")  # True
 ```
 
 ## Production Roadmap

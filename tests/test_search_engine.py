@@ -26,7 +26,6 @@ class TestSearchEngine:
     def test_search_engine_initialization(self, engine):
         """Test that SearchEngine connects to existing collection correctly."""
         assert engine.collection is not None
-        assert engine.acl_manager is not None
         assert engine.collection_name == "resources_db"
 
     # ==================== Basic Search ====================

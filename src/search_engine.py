@@ -6,25 +6,20 @@ import json
 
 import chromadb
 
-from .acl import ACLManager
-
 
 class SearchEngine:
-    def __init__(self, collection_name: str = "resources_db", acl_path: str = "config/acl.json"):
+    def __init__(self, collection_name: str = "resources_db"):
         """
         Initialize SearchEngine for querying the vector database.
         
         Note: The database must be initialized by DBManager before using SearchEngine.
+        Permissions are handled via metadata stored in the database by DBManager.
         
         Args:
             collection_name: Name of the ChromaDB collection to query (default: "resources_db")
-            acl_path: Path to ACL configuration file for permission checks
         """
         self.client = chromadb.Client()
         self.collection_name = collection_name
-        
-        # Initialize ACL manager for permission checks
-        self.acl_manager = ACLManager(acl_path=acl_path)
         
         # Get the existing collection (must be initialized by DBManager first)
         try:
