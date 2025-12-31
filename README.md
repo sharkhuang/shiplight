@@ -44,38 +44,19 @@ shiplight/
 
 ## Usage
 
-### Search Engine
+### Architecture
 
-```python
-from search_engine import SearchEngine
+**Important**: The database must be initialized by `DBManager` before using `SearchEngine` for queries.
 
-# Initialize
-engine = SearchEngine()
-engine.init_vector_db()
+- **DBManager**: Responsible for initializing and updating the vector database
+- **SearchEngine**: Responsible for querying/searching the database (read-only operations)
 
-# Search all documents
-results = engine.search("test content")
-
-# Search with user permission filtering
-results = engine.search("test content", user_id="user1")
-
-# Choose search method
-results = engine.search("query", user_id="user1", method="filter_first")  # default
-results = engine.search("query", user_id="user1", method="query_first")
-```
-
-### Search Methods
-
-| Method | Description | Best For |
-|--------|-------------|----------|
-| `filter_first` | Filter by permissions, then search | Users with limited access |
-| `query_first` | Search all, then filter results | Better relevance ranking |
-
-### Database Management
+### Database Management (Initialization & Updates)
 
 ```python
 from db_update import DBManager
 
+# Initialize database (first time or full rebuild)
 db = DBManager()
 db.init_db()
 
@@ -103,6 +84,37 @@ db.update_db(
 # Delete
 db.delete_documents(["doc1"])
 ```
+
+### Search Engine (Querying)
+
+```python
+from db_update import DBManager
+from search_engine import SearchEngine
+
+# Step 1: Initialize database (if not already done)
+db = DBManager()
+db.init_db()
+
+# Step 2: Use SearchEngine to query
+engine = SearchEngine(collection_name="resources_db")
+
+# Search all documents
+results = engine.search("test content")
+
+# Search with user permission filtering
+results = engine.search("test content", user_id="user1")
+
+# Choose search method
+results = engine.search("query", user_id="user1", method="filter_first")  # default
+results = engine.search("query", user_id="user1", method="query_first")
+```
+
+### Search Methods
+
+| Method | Description | Best For |
+|--------|-------------|----------|
+| `filter_first` | Filter by permissions, then search | Users with limited access |
+| `query_first` | Search all, then filter results | Better relevance ranking |
 
 ### ACL Configuration
 

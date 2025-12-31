@@ -9,62 +9,31 @@ import chromadb
 
 
 class SearchEngine:
-    def __init__(self, resources_dir: str = "resources", acl_path: str = "config/acl.json"):
-        self.resources_dir = Path(resources_dir)
+    def __init__(self, collection_name: str = "resources_db", acl_path: str = "config/acl.json"):
+        """
+        Initialize SearchEngine for querying the vector database.
+        
+        Note: The database must be initialized by DBManager before using SearchEngine.
+        
+        Args:
+            collection_name: Name of the ChromaDB collection to query (default: "resources_db")
+            acl_path: Path to ACL configuration file for permission checks
+        """
         self.acl_path = Path(acl_path)
         self.client = chromadb.Client()
-        self.collection = None
-        self.acl = {}
-
-    def init_vector_db(self) -> None:
-        """
-        Initialize vector DB with files from resources folder
-        and permissions from ACL configuration.
-        """
-        # Load ACL configuration
+        self.collection_name = collection_name
+        
+        # Load ACL configuration for permission checks
         self.acl = self._load_acl()
-
-        # Create collection
-        self.collection = self.client.get_or_create_collection(name="resources_search")
-
-        # Load resource files and index them
-        documents = []
-        metadatas = []
-        ids = []
-
-        for file_path in self.resources_dir.iterdir():
-            if file_path.is_file():
-                # Read file content
-                content = file_path.read_text()
-
-                # Get permissions for this file
-                relative_path = str(file_path)
-                permissions = self._get_file_permissions(relative_path)
-
-                # Build metadata with user access flags for filtering
-                metadata = {
-                    "filename": file_path.name,
-                    "path": relative_path,
-                    "permissions": json.dumps(permissions),
-                }
-                
-                # Add boolean flags for each user's access (enables metadata filtering)
-                for user_id in self.acl.get("users", {}).keys():
-                    metadata[f"{user_id}_access"] = user_id in permissions
-
-                documents.append(content)
-                metadatas.append(metadata)
-                ids.append(file_path.name)
-
-        # Add to vector DB
-        if documents:
-            self.collection.add(
-                documents=documents,
-                metadatas=metadatas,
-                ids=ids,
-            )
-
-        print(f"Initialized vector DB with {len(documents)} files from {self.resources_dir}")
+        
+        # Get the existing collection (must be initialized by DBManager first)
+        try:
+            self.collection = self.client.get_collection(name=collection_name)
+        except Exception as e:
+            raise RuntimeError(
+                f"Collection '{collection_name}' not found. "
+                f"Please initialize the database using DBManager.init_db() first."
+            ) from e
 
     def _load_acl(self) -> dict:
         """Load ACL configuration from JSON file."""
@@ -105,7 +74,9 @@ class SearchEngine:
             List of search results with metadata
         """
         if not self.collection:
-            raise RuntimeError("Vector DB not initialized. Call init_vector_db() first.")
+            raise RuntimeError(
+                "Collection not available. Ensure DBManager has initialized the database."
+            )
 
         if method == "filter_first":
             return self._search_filter_first(query, user_id, n_results)
@@ -190,10 +161,23 @@ class SearchEngine:
 
 def main():
     """Quick demo of SearchEngine."""
-    engine = SearchEngine()
-    engine.init_vector_db()
-
-    print("\nSearchEngine initialized. Run tests with: pytest tests/ -v")
+    from db_update import DBManager
+    
+    # First, initialize the database using DBManager
+    print("Initializing database with DBManager...")
+    db = DBManager()
+    db.init_db()
+    
+    # Then, use SearchEngine to query
+    print("\nSearching with SearchEngine...")
+    engine = SearchEngine(collection_name="resources_db")
+    results = engine.search("test", n_results=5)
+    
+    print(f"\nFound {len(results)} results:")
+    for i, result in enumerate(results, 1):
+        print(f"{i}. {result['filename']} (distance: {result['distance']:.4f})")
+    
+    print("\nRun tests with: pytest tests/ -v")
 
 
 if __name__ == "__main__":

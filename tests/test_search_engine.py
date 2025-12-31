@@ -4,6 +4,7 @@ Unit tests for SearchEngine
 
 import pytest
 from search_engine import SearchEngine
+from db_update import DBManager
 
 
 class TestSearchEngine:
@@ -11,17 +12,22 @@ class TestSearchEngine:
 
     @pytest.fixture
     def engine(self):
-        """Create and initialize a SearchEngine instance."""
-        engine = SearchEngine()
-        engine.init_vector_db()
+        """Create and initialize database, then create SearchEngine instance."""
+        # First, initialize the database using DBManager
+        db = DBManager(collection_name="resources_db")
+        db.init_db()
+        
+        # Then, create SearchEngine to query the database
+        engine = SearchEngine(collection_name="resources_db")
         return engine
 
     # ==================== Initialization ====================
 
-    def test_init_vector_db(self, engine):
-        """Test that vector DB initializes correctly."""
+    def test_search_engine_initialization(self, engine):
+        """Test that SearchEngine connects to existing collection correctly."""
         assert engine.collection is not None
         assert engine.acl is not None
+        assert engine.collection_name == "resources_db"
 
     # ==================== Basic Search ====================
 
