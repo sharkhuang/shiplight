@@ -149,28 +149,3 @@ class SearchEngine:
 
         return formatted
 
-
-def main():
-    """Quick demo of SearchEngine."""
-    from .db import DBManager
-    
-    # First, initialize the database using DBManager
-    print("Initializing database with DBManager...")
-    db = DBManager()
-    db.init_db()
-    
-    # Then, use SearchEngine to query
-    print("\nSearching with SearchEngine...")
-    engine = SearchEngine(collection_name="resources_db")
-    results = engine.search("test", n_results=5)
-    
-    print(f"\nFound {len(results)} results:")
-    for i, result in enumerate(results, 1):
-        print(f"{i}. {result['filename']} (distance: {result['distance']:.4f})")
-    
-    print("\nRun tests with: pytest tests/ -v")
-
-
-if __name__ == "__main__":
-    main()
-

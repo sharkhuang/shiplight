@@ -3,6 +3,8 @@ Database Module - Initialize and manage ChromaDB vector database
 """
 
 import json
+import mimetypes
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal, Optional
 
@@ -57,6 +59,71 @@ class DBManager:
         # Initialize ACL manager
         self.acl_manager = ACLManager(acl_path=acl_path)
 
+    def _build_metadata(
+        self,
+        file_path: Path,
+        permissions: Optional[dict] = None,
+        preserve_created_at: Optional[str] = None,
+    ) -> dict:
+        """
+        Build complete metadata for a document, including standard fields and permission fields.
+        
+        Args:
+            file_path: File path object
+            permissions: Optional permission dictionary. If not provided, will be loaded from ACL config
+            preserve_created_at: If provided, preserve the original creation time (for update scenarios)
+        
+        Returns:
+            Complete metadata dictionary
+        """
+        # Get permissions from ACL if not provided
+        if permissions is None:
+            relative_path = str(file_path)
+            permissions = self.acl_manager.get_file_permissions(relative_path)
+        
+        # Read file information
+        try:
+            if file_path.exists():
+                file_size = file_path.stat().st_size
+                content = file_path.read_text()
+                content_length = len(content)
+            else:
+                # File doesn't exist (update scenario)
+                file_size = 0
+                content_length = 0
+        except Exception:
+            file_size = 0
+            content_length = 0
+        
+        # Generate timestamp
+        current_time = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        
+        # Infer content type
+        mime_type, _ = mimetypes.guess_type(str(file_path))
+        content_type = mime_type or "text/plain"
+        
+        # Build base metadata
+        metadata = {
+            # Base fields
+            "filename": file_path.name,
+            "path": str(file_path),
+            "permissions": json.dumps(permissions or {}),
+            
+            # Standard metadata fields
+            "created_at": preserve_created_at or current_time,
+            "updated_at": current_time,
+            "content_type": content_type,
+            "file_size": file_size,
+            "content_length": content_length,
+            "metadata_version": "1.0",
+        }
+        
+        # Add permission boolean flags (keep existing logic unchanged)
+        for user_id in self.acl_manager.acl.get("users", {}).keys():
+            metadata[f"{user_id}_access"] = user_id in (permissions or {})
+        
+        return metadata
+
     def init_db(self) -> None:
         """
         Initialize the vector database from resources folder and ACL config.
@@ -75,19 +142,9 @@ class DBManager:
         for file_path in self.resources_dir.iterdir():
             if file_path.is_file():
                 content = file_path.read_text()
-                relative_path = str(file_path)
-                permissions = self.acl_manager.get_file_permissions(relative_path)
-
-                # Build metadata with user access flags
-                metadata = {
-                    "filename": file_path.name,
-                    "path": relative_path,
-                    "permissions": json.dumps(permissions),
-                }
-
-                # Add boolean flags for each user's access
-                for user_id in self.acl_manager.acl.get("users", {}).keys():
-                    metadata[f"{user_id}_access"] = user_id in permissions
+                
+                # Use unified metadata building method
+                metadata = self._build_metadata(file_path)
 
                 documents.append(content)
                 metadatas.append(metadata)
@@ -213,22 +270,21 @@ class DBManager:
                     f"Use upsert_if_missing=True to create it if it doesn't exist."
                 )
 
-        # Get permissions from ACL if not provided
-        if permissions is None:
-            relative_path = str(path)
-            permissions = self.acl_manager.get_file_permissions(relative_path)
+        # Get existing document's created_at (if exists) to preserve timestamp consistency
+        existing_docs = self.collection.get(ids=[doc_id])
+        preserve_created_at = None
+        if len(existing_docs["ids"]) > 0 and existing_docs["metadatas"]:
+            existing_metadata = existing_docs["metadatas"][0]
+            preserve_created_at = existing_metadata.get("created_at")
 
         content = path.read_text()
         
-        metadata = {
-            "filename": path.name,
-            "path": str(path),
-            "permissions": json.dumps(permissions or {}),
-        }
-
-        # Add boolean flags for each user's access (consistent with init_db)
-        for user_id in self.acl_manager.acl.get("users", {}).keys():
-            metadata[f"{user_id}_access"] = user_id in (permissions or {})
+        # Use unified metadata building method
+        metadata = self._build_metadata(
+            path,
+            permissions=permissions,
+            preserve_created_at=preserve_created_at,
+        )
 
         # Use update or upsert based on flag
         operation = "upsert" if upsert_if_missing else "update"
@@ -253,71 +309,4 @@ class DBManager:
             raise RuntimeError("DB not initialized. Call init_db() first.")
 
         return self.collection.get()
-
-
-def main():
-    """Demo usage of DBManager."""
-    # Initialize database
-    db = DBManager()
-    db.init_db()
-
-    print("\n" + "=" * 50)
-    print("DB UPDATE DEMO")
-    print("=" * 50)
-
-    # Show current documents
-    print("\n[Current Documents]")
-    docs = db.get_all_documents()
-    for i, doc_id in enumerate(docs["ids"]):
-        print(f"  - {doc_id}")
-
-    # Add new document
-    print("\n[Adding new document]")
-    db.update_db(
-        ids=["new_doc"],
-        documents=["This is a new document added via update_db"],
-        metadatas=[{"type": "dynamic", "user1_access": True}],
-        operation="add",
-    )
-
-    # Upsert (update existing + add new)
-    print("\n[Upserting documents]")
-    db.update_db(
-        ids=["new_doc", "another_doc"],
-        documents=["Updated content for new_doc", "Another new document"],
-        metadatas=[{"type": "updated"}, {"type": "new"}],
-        operation="upsert",
-    )
-
-    # Show updated documents
-    print("\n[Documents after updates]")
-    docs = db.get_all_documents()
-    for i, doc_id in enumerate(docs["ids"]):
-        print(f"  - {doc_id}")
-
-    # Update an existing resource file
-    print("\n[Updating existing resource file]")
-    if db.resources_dir.exists() and any(db.resources_dir.iterdir()):
-        # Get first file from resources directory
-        first_file = next(db.resources_dir.iterdir(), None)
-        if first_file and first_file.is_file():
-            try:
-                db.update_resource_file(str(first_file))
-                print(f"  Updated: {first_file.name}")
-            except Exception as e:
-                print(f"  Error updating {first_file.name}: {e}")
-
-    # Delete a document
-    print("\n[Deleting 'another_doc']")
-    db.delete_documents(["another_doc"])
-
-    # Final state
-    print("\n[Final documents]")
-    docs = db.get_all_documents()
-    for i, doc_id in enumerate(docs["ids"]):
-        print(f"  - {doc_id}")
-
-
-if __name__ == "__main__":
-    main()
 
