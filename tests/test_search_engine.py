@@ -3,8 +3,8 @@ Unit tests for SearchEngine
 """
 
 import pytest
-from search_engine import SearchEngine
-from db_update import DBManager
+from src.search_engine import SearchEngine
+from src.db_update import DBManager
 
 
 class TestSearchEngine:
@@ -26,7 +26,7 @@ class TestSearchEngine:
     def test_search_engine_initialization(self, engine):
         """Test that SearchEngine connects to existing collection correctly."""
         assert engine.collection is not None
-        assert engine.acl is not None
+        assert engine.acl_manager is not None
         assert engine.collection_name == "resources_db"
 
     # ==================== Basic Search ====================
@@ -86,19 +86,6 @@ class TestSearchEngine:
         """Test non-existent user returns no results."""
         results = engine.search("test", user_id="nonexistent_user")
         assert len(results) == 0
-
-    # ==================== can_access API ====================
-
-    def test_can_access_granted(self, engine):
-        """Test can_access returns True for valid permissions."""
-        assert engine.can_access("user1", "resources/testfile1.txt", "read") is True
-        assert engine.can_access("user1", "resources/testfile1.txt", "write") is True
-        assert engine.can_access("user2", "resources/testfile2.txt", "read") is True
-
-    def test_can_access_denied(self, engine):
-        """Test can_access returns False for invalid permissions."""
-        assert engine.can_access("user1", "resources/testfile2.txt", "read") is False
-        assert engine.can_access("user2", "resources/testfile1.txt", "write") is False
 
     # ==================== Search Methods ====================
 

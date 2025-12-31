@@ -54,7 +54,7 @@ shiplight/
 ### Database Management (Initialization & Updates)
 
 ```python
-from db_update import DBManager
+from src.db_update import DBManager
 
 # Initialize database (first time or full rebuild)
 db = DBManager()
@@ -88,8 +88,8 @@ db.delete_documents(["doc1"])
 ### Search Engine (Querying)
 
 ```python
-from db_update import DBManager
-from search_engine import SearchEngine
+from src.db_update import DBManager
+from src.search_engine import SearchEngine
 
 # Step 1: Initialize database (if not already done)
 db = DBManager()
@@ -141,9 +141,17 @@ Resource-centric ACL in `config/acl.json`:
 ### Check Permissions
 
 ```python
+from src.acl import ACLManager
+
+# Create ACL manager
+acl = ACLManager()
+
 # Check if user can perform action
-can_read = engine.can_access("user1", "resources/testfile1.txt", "read")  # True
-can_write = engine.can_access("user2", "resources/testfile1.txt", "write")  # False
+can_read = acl.can_access("user1", "resources/testfile1.txt", "read")  # True
+can_write = acl.can_access("user2", "resources/testfile1.txt", "write")  # False
+
+# Or access via SearchEngine's ACL manager
+can_read = engine.acl_manager.can_access("user1", "resources/testfile1.txt", "read")  # True
 ```
 
 ## Production Roadmap

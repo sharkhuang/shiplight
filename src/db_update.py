@@ -8,6 +8,8 @@ from typing import Literal, Optional
 
 import chromadb
 
+from .acl import ACLManager
+
 
 class DBManager:
     """Manages ChromaDB vector database initialization and updates."""
@@ -19,11 +21,12 @@ class DBManager:
         collection_name: str = "resources_db",
     ):
         self.resources_dir = Path(resources_dir)
-        self.acl_path = Path(acl_path)
         self.collection_name = collection_name
         self.client = chromadb.Client()
         self.collection = None
-        self.acl = {}
+        
+        # Initialize ACL manager
+        self.acl_manager = ACLManager(acl_path=acl_path)
 
     def init_db(self) -> None:
         """
@@ -32,9 +35,6 @@ class DBManager:
         Reads all files from resources folder and indexes them with
         permission metadata from ACL configuration.
         """
-        # Load ACL configuration
-        self.acl = self._load_acl()
-
         # Create or get collection
         self.collection = self.client.get_or_create_collection(name=self.collection_name)
 
@@ -47,7 +47,7 @@ class DBManager:
             if file_path.is_file():
                 content = file_path.read_text()
                 relative_path = str(file_path)
-                permissions = self._get_file_permissions(relative_path)
+                permissions = self.acl_manager.get_file_permissions(relative_path)
 
                 # Build metadata with user access flags
                 metadata = {
@@ -57,7 +57,7 @@ class DBManager:
                 }
 
                 # Add boolean flags for each user's access
-                for user_id in self.acl.get("users", {}).keys():
+                for user_id in self.acl_manager.acl.get("users", {}).keys():
                     metadata[f"{user_id}_access"] = user_id in permissions
 
                 documents.append(content)
@@ -167,10 +167,6 @@ class DBManager:
         if not self.collection:
             raise RuntimeError("DB not initialized. Call init_db() first.")
 
-        # Load ACL if not already loaded
-        if not self.acl:
-            self.acl = self._load_acl()
-
         doc_id = path.name
 
         # If upsert_if_missing is True, we can skip existence check and use upsert directly
@@ -191,7 +187,7 @@ class DBManager:
         # Get permissions from ACL if not provided
         if permissions is None:
             relative_path = str(path)
-            permissions = self._get_file_permissions(relative_path)
+            permissions = self.acl_manager.get_file_permissions(relative_path)
 
         content = path.read_text()
         
@@ -202,7 +198,7 @@ class DBManager:
         }
 
         # Add boolean flags for each user's access (consistent with init_db)
-        for user_id in self.acl.get("users", {}).keys():
+        for user_id in self.acl_manager.acl.get("users", {}).keys():
             metadata[f"{user_id}_access"] = user_id in (permissions or {})
 
         # Use update or upsert based on flag
@@ -221,23 +217,6 @@ class DBManager:
 
         self.collection.delete(ids=ids)
         print(f"Deleted {len(ids)} documents")
-
-    def _load_acl(self) -> dict:
-        """Load ACL configuration from JSON file."""
-        if not self.acl_path.exists():
-            print(f"Warning: ACL file not found at {self.acl_path}")
-            return {}
-
-        with open(self.acl_path, "r") as f:
-            return json.load(f)
-
-    def _get_file_permissions(self, file_path: str) -> dict:
-        """Get permissions for a file from ACL configuration.
-        
-        New structure: resources -> { resource_path: { user_id: [permissions] } }
-        """
-        resources = self.acl.get("resources", {})
-        return resources.get(file_path, {})
 
     def get_all_documents(self) -> dict:
         """Get all documents in the collection."""

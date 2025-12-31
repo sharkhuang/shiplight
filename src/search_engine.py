@@ -3,9 +3,10 @@ Search Engine - Vector DB initialized with resources and ACL permissions
 """
 
 import json
-from pathlib import Path
 
 import chromadb
+
+from .acl import ACLManager
 
 
 class SearchEngine:
@@ -19,12 +20,11 @@ class SearchEngine:
             collection_name: Name of the ChromaDB collection to query (default: "resources_db")
             acl_path: Path to ACL configuration file for permission checks
         """
-        self.acl_path = Path(acl_path)
         self.client = chromadb.Client()
         self.collection_name = collection_name
         
-        # Load ACL configuration for permission checks
-        self.acl = self._load_acl()
+        # Initialize ACL manager for permission checks
+        self.acl_manager = ACLManager(acl_path=acl_path)
         
         # Get the existing collection (must be initialized by DBManager first)
         try:
@@ -34,23 +34,6 @@ class SearchEngine:
                 f"Collection '{collection_name}' not found. "
                 f"Please initialize the database using DBManager.init_db() first."
             ) from e
-
-    def _load_acl(self) -> dict:
-        """Load ACL configuration from JSON file."""
-        if not self.acl_path.exists():
-            print(f"Warning: ACL file not found at {self.acl_path}")
-            return {}
-
-        with open(self.acl_path, "r") as f:
-            return json.load(f)
-
-    def _get_file_permissions(self, file_path: str) -> dict:
-        """Get permissions for a file from ACL configuration.
-        
-        New structure: resources -> { resource_path: { user_id: [permissions] } }
-        """
-        resources = self.acl.get("resources", {})
-        return resources.get(file_path, {})
 
     def search(
         self,
@@ -147,21 +130,10 @@ class SearchEngine:
 
         return formatted
 
-    def can_access(self, user_id: str, file_path: str, action: str = "read") -> bool:
-        """Check if a user can perform an action on a file.
-        
-        New structure: resources -> { resource_path: { user_id: [permissions] } }
-        """
-        resources = self.acl.get("resources", {})
-        resource_perms = resources.get(file_path, {})
-        user_perms = resource_perms.get(user_id, [])
-
-        return action in user_perms
-
 
 def main():
     """Quick demo of SearchEngine."""
-    from db_update import DBManager
+    from .db_update import DBManager
     
     # First, initialize the database using DBManager
     print("Initializing database with DBManager...")
