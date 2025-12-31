@@ -132,17 +132,66 @@ class DBManager:
         else:
             raise ValueError(f"Invalid operation: {operation}. Use 'add', 'update', or 'upsert'")
 
-    def add_resource_file(self, file_path: str, permissions: Optional[dict] = None) -> None:
+    def update_resource_file(
+        self, 
+        file_path: str, 
+        permissions: Optional[dict] = None,
+        upsert_if_missing: bool = False
+    ) -> None:
         """
-        Add a single resource file to the database.
+        Update or add a resource file in the database.
         
         Args:
-            file_path: Path to the file to add
+            file_path: Path to the file to update or add
             permissions: Optional permission dict, e.g. {"user1": ["read", "write"]}
+                If not provided, will try to load from ACL configuration
+            upsert_if_missing: If True, create the document if it doesn't exist (upsert).
+                This allows the method to be used for both adding and updating files.
+                If False, raise an error if the document doesn't exist (default: False)
+        
+        Examples:
+            # Update existing file (strict mode)
+            db.update_resource_file("resources/file.txt")
+            
+            # Add or update file (upsert mode)
+            db.update_resource_file("resources/file.txt", upsert_if_missing=True)
+        
+        Raises:
+            FileNotFoundError: If the file doesn't exist on disk
+            RuntimeError: If the document doesn't exist in DB and upsert_if_missing is False
         """
         path = Path(file_path)
         if not path.exists():
             raise FileNotFoundError(f"File not found: {file_path}")
+
+        if not self.collection:
+            raise RuntimeError("DB not initialized. Call init_db() first.")
+
+        # Load ACL if not already loaded
+        if not self.acl:
+            self.acl = self._load_acl()
+
+        doc_id = path.name
+
+        # If upsert_if_missing is True, we can skip existence check and use upsert directly
+        if upsert_if_missing:
+            # Skip existence check - upsert will handle both create and update
+            pass
+        else:
+            # Check if document exists for strict update mode
+            existing_docs = self.collection.get(ids=[doc_id])
+            document_exists = len(existing_docs["ids"]) > 0
+
+            if not document_exists:
+                raise RuntimeError(
+                    f"Document '{doc_id}' not found in database. "
+                    f"Use upsert_if_missing=True to create it if it doesn't exist."
+                )
+
+        # Get permissions from ACL if not provided
+        if permissions is None:
+            relative_path = str(path)
+            permissions = self._get_file_permissions(relative_path)
 
         content = path.read_text()
         
@@ -152,16 +201,17 @@ class DBManager:
             "permissions": json.dumps(permissions or {}),
         }
 
-        # Add user access flags
-        if permissions:
-            for user_id in permissions.keys():
-                metadata[f"{user_id}_access"] = True
+        # Add boolean flags for each user's access (consistent with init_db)
+        for user_id in self.acl.get("users", {}).keys():
+            metadata[f"{user_id}_access"] = user_id in (permissions or {})
 
+        # Use update or upsert based on flag
+        operation = "upsert" if upsert_if_missing else "update"
         self.update_db(
-            ids=[path.name],
+            ids=[doc_id],
             documents=[content],
             metadatas=[metadata],
-            operation="upsert",
+            operation=operation,
         )
 
     def delete_documents(self, ids: list[str]) -> None:
@@ -236,6 +286,18 @@ def main():
     docs = db.get_all_documents()
     for i, doc_id in enumerate(docs["ids"]):
         print(f"  - {doc_id}")
+
+    # Update an existing resource file
+    print("\n[Updating existing resource file]")
+    if db.resources_dir.exists() and any(db.resources_dir.iterdir()):
+        # Get first file from resources directory
+        first_file = next(db.resources_dir.iterdir(), None)
+        if first_file and first_file.is_file():
+            try:
+                db.update_resource_file(str(first_file))
+                print(f"  Updated: {first_file.name}")
+            except Exception as e:
+                print(f"  Error updating {first_file.name}: {e}")
 
     # Delete a document
     print("\n[Deleting 'another_doc']")
