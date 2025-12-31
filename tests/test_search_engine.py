@@ -183,6 +183,50 @@ class TestSearchEngine:
         assert filter_results[0]["filename"] == "testfile1.txt"
         assert len(query_results) == 0  # Accessible doc not in top 1
 
+    def test_search_returns_new_file_for_user1(self, engine, tmp_path):
+        """Test that when a new file3 is added for user1, search returns it along with existing files."""
+        import json
+        
+        # Create DBManager instance using the same test database path
+        test_db_path = str(tmp_path / "test_db")
+        db = DBManager(
+            collection_name="resources_db",
+            persist_directory=test_db_path
+        )
+        # Collection already exists from engine fixture, so we can use it directly
+        db.collection = engine.collection
+        
+        # Add new file3 for user1
+        file3_content = "This is testfile3 content for user1"
+        file3_permissions = {"user1": ["read"]}
+        
+        db.update_db(
+            ids=["testfile3.txt"],
+            documents=[file3_content],
+            metadatas=[{
+                "filename": "testfile3.txt",
+                "path": "resources/testfile3.txt",
+                "permissions": json.dumps(file3_permissions),
+                "user1_access": True,
+                "user2_access": False,
+            }],
+            operation="add",
+        )
+        
+        # Search for user1 - should return both testfile1.txt and testfile3.txt
+        results = engine.search("test", user_id="user1")
+        
+        # Verify results include both files
+        assert len(results) >= 2
+        filenames = {r["filename"] for r in results}
+        assert "testfile1.txt" in filenames
+        assert "testfile3.txt" in filenames
+        
+        # Verify testfile3.txt is in the results with correct content
+        file3_result = next(r for r in results if r["filename"] == "testfile3.txt")
+        assert file3_result["content"] == file3_content
+        assert file3_result["permissions"] == file3_permissions
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
