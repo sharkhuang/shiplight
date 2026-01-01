@@ -11,6 +11,7 @@ from typing import Literal, Optional
 import chromadb
 
 from .acl import ACLManager
+from .models import DocumentMetadata
 
 
 class DBManager:
@@ -102,8 +103,8 @@ class DBManager:
         mime_type, _ = mimetypes.guess_type(str(file_path))
         content_type = mime_type or "text/plain"
         
-        # Build base metadata
-        metadata = {
+        # Build base metadata using DocumentMetadata model
+        metadata_dict = {
             # Base fields
             "filename": file_path.name,
             "path": str(file_path),
@@ -118,11 +119,15 @@ class DBManager:
             "metadata_version": "1.0",
         }
         
-        # Add permission boolean flags (keep existing logic unchanged)
+        # Add permission boolean flags (dynamic fields)
         for user_id in self.acl_manager.acl.get("users", {}).keys():
-            metadata[f"{user_id}_access"] = user_id in (permissions or {})
+            metadata_dict[f"{user_id}_access"] = user_id in (permissions or {})
         
-        return metadata
+        # Validate and create DocumentMetadata instance
+        metadata_model = DocumentMetadata.model_validate(metadata_dict)
+        
+        # Return as dictionary for ChromaDB compatibility
+        return metadata_model.to_dict()
 
     def init_db(self) -> None:
         """
